@@ -14,15 +14,15 @@
 
 #include <chrono>
 #include <fstream>
+#include <gflags/gflags.h>
+#include <glog/logging.h>
+#include <iomanip>
 #include <iostream>
 #include <numeric>
+#include <paddle_inference_api.h>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <iomanip>
-#include <gflags/gflags.h>
-#include <glog/logging.h>
-#include <paddle_inference_api.h>
 
 #ifdef ENABLE_PADDLE_PROFILER
 #include <paddle/fluid/platform/profiler.h>
@@ -38,15 +38,12 @@ DEFINE_bool(print_outputs, false, "Whether to output the prediction results.");
 DEFINE_bool(use_gpu, false, "Whether use GPU to infer.");
 DEFINE_bool(use_analysis, false, "Whether use Paddle's AnalysisPredictor.");
 
-
-template <typename T>
-void Print(std::string key, T value) {
+template <typename T> void Print(std::string key, T value) {
   std::cout.flags(std::ios::left);
   std::cout << std::setw(20) << key << ": " << value << std::endl;
 }
 
-template <>
-void Print<bool>(std::string key, bool value) {
+template <> void Print<bool>(std::string key, bool value) {
   std::cout.flags(std::ios::left);
   if (value) {
     std::cout << std::setw(20) << key << ": true" << std::endl;
@@ -76,8 +73,7 @@ void InitFLAGS(int argc, char *argv[]) {
 #endif
 }
 
-template <typename T>
-void GetValueFromStream(std::stringstream *ss, T *t) {
+template <typename T> void GetValueFromStream(std::stringstream *ss, T *t) {
   (*ss) >> (*t);
 }
 
@@ -110,16 +106,13 @@ void Split(const std::string &line, char sep, std::vector<T> *v) {
   }
 }
 
-template <typename T>
-constexpr paddle::PaddleDType GetPaddleDType();
+template <typename T> constexpr paddle::PaddleDType GetPaddleDType();
 
-template <>
-constexpr paddle::PaddleDType GetPaddleDType<int64_t>() {
+template <> constexpr paddle::PaddleDType GetPaddleDType<int64_t>() {
   return paddle::PaddleDType::INT64;
 }
 
-template <>
-constexpr paddle::PaddleDType GetPaddleDType<float>() {
+template <> constexpr paddle::PaddleDType GetPaddleDType<float>() {
   return paddle::PaddleDType::FLOAT32;
 }
 
@@ -128,7 +121,8 @@ template <typename T>
 bool ParseTensor(const std::string &field, paddle::PaddleTensor *tensor) {
   std::vector<std::string> data;
   Split(field, ':', &data);
-  if (data.size() < 2) return false;
+  if (data.size() < 2)
+    return false;
 
   std::string shape_str = data[0];
 
@@ -214,20 +208,25 @@ bool LoadInputData(std::vector<std::vector<paddle::PaddleTensor>> *inputs) {
   return true;
 }
 
-void PrintOutputs(const std::vector<paddle::PaddleTensor> &outputs, int id, double time) {
-  //LOG(INFO) << "example_id\tcontradiction\tentailment\tneutral";
-  for (size_t i = 0; i < outputs.front().data.length() / sizeof(float) / 3; i += 1) {
+void PrintOutputs(const std::vector<paddle::PaddleTensor> &outputs, int id,
+                  double time) {
+  // LOG(INFO) << "example_id\tcontradiction\tentailment\tneutral";
+  for (size_t i = 0; i < outputs.front().data.length() / sizeof(float) / 3;
+       i += 1) {
     std::cout.flags(std::ios::right);
-    std::cout << "example " << std::setw(5) << id
-              << ", [" << std::setw(12) << static_cast<float *>(outputs[0].data.data())[3 * i]
-              << ", " << std::setw(12) << static_cast<float *>(outputs[0].data.data())[3 * i + 1]
-              << ", " << std::setw(12) << static_cast<float *>(outputs[0].data.data())[3 * i + 2]
+    std::cout << "example " << std::setw(5) << id << ", [" << std::setw(12)
+              << static_cast<float *>(outputs[0].data.data())[3 * i] << ", "
+              << std::setw(12)
+              << static_cast<float *>(outputs[0].data.data())[3 * i + 1] << ", "
+              << std::setw(12)
+              << static_cast<float *>(outputs[0].data.data())[3 * i + 2]
               << "], time: " << time << " ms" << std::endl;
   }
 }
 
 template <typename ConfigType>
-void SetConfig(ConfigType* config, std::string model_dir, bool use_gpu, bool use_zerocopy) {
+void SetConfig(ConfigType *config, std::string model_dir, bool use_gpu,
+               bool use_zerocopy) {
   config->model_dir = model_dir;
   if (use_gpu) {
     config->use_gpu = true;
@@ -240,8 +239,9 @@ void SetConfig(ConfigType* config, std::string model_dir, bool use_gpu, bool use
 }
 
 template <>
-void SetConfig<paddle::AnalysisConfig>(paddle::AnalysisConfig* config, std::string model_dir,
-                               bool use_gpu, bool use_zerocopy) {
+void SetConfig<paddle::AnalysisConfig>(paddle::AnalysisConfig *config,
+                                       std::string model_dir, bool use_gpu,
+                                       bool use_zerocopy) {
   config->SetModel(model_dir);
   if (use_gpu) {
     config->EnableUseGpu(100, 0);
@@ -251,18 +251,23 @@ void SetConfig<paddle::AnalysisConfig>(paddle::AnalysisConfig* config, std::stri
     config->SetCpuMathLibraryNumThreads(FLAGS_num_threads);
   }
   config->SwitchIrOptim(true);
+  // config->pass_builder()->DeletePass("fc_fuse_pass");
+
   // config.SwitchSpecifyInputNames();
   if (use_zerocopy) {
     config->SwitchUseFeedFetchOps(false);
   }
-  // config->SwitchIrDebug();
+  config->SwitchIrDebug(true);
 }
 
-std::unique_ptr<paddle::PaddlePredictor> CreatePredictor(
-        const paddle::PaddlePredictor::Config *config, bool use_analysis = true) {
-  const auto *analysis_config = reinterpret_cast<const paddle::AnalysisConfig *>(config);
+std::unique_ptr<paddle::PaddlePredictor>
+CreatePredictor(const paddle::PaddlePredictor::Config *config,
+                bool use_analysis = true) {
+  const auto *analysis_config =
+      reinterpret_cast<const paddle::AnalysisConfig *>(config);
   if (use_analysis) {
-    return paddle::CreatePaddlePredictor<paddle::AnalysisConfig>(*analysis_config);
+    return paddle::CreatePaddlePredictor<paddle::AnalysisConfig>(
+        *analysis_config);
   }
   auto native_config = analysis_config->ToNativeConfig();
   return paddle::CreatePaddlePredictor<paddle::NativeConfig>(native_config);
@@ -276,8 +281,8 @@ struct Timer {
   double toc() {
     startu = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> time_span =
-      std::chrono::duration_cast<std::chrono::duration<double>>(startu -
-          start);
+        std::chrono::duration_cast<std::chrono::duration<double>>(startu -
+                                                                  start);
     double used_time_ms = static_cast<double>(time_span.count()) * 1000.0;
     return used_time_ms;
   }
@@ -287,9 +292,11 @@ int main(int argc, char *argv[]) {
   InitFLAGS(argc, argv);
 
   paddle::AnalysisConfig config;
-  SetConfig<paddle::AnalysisConfig>(&config, FLAGS_model_dir, FLAGS_use_gpu, false);
+  SetConfig<paddle::AnalysisConfig>(&config, FLAGS_model_dir, FLAGS_use_gpu,
+                                    false);
   auto predictor = CreatePredictor(
-      reinterpret_cast<paddle::PaddlePredictor::Config *>(&config), FLAGS_use_analysis);
+      reinterpret_cast<paddle::PaddlePredictor::Config *>(&config),
+      FLAGS_use_analysis);
 
   std::vector<std::vector<paddle::PaddleTensor>> inputs;
   if (!LoadInputData(&inputs)) {
@@ -315,6 +322,7 @@ int main(int argc, char *argv[]) {
   for (int repeat = 0; repeat < FLAGS_repeat; repeat++) {
     for (int id = 0; id < inputs.size(); ++id) {
       fetch.clear();
+      std::cout << "--- iteration " << id << " ---" << std::endl;
 
       Timer timer;
       timer.tic();
@@ -329,7 +337,8 @@ int main(int argc, char *argv[]) {
         num_samples += fetch.front().data.length() / (sizeof(float) * 3);
         if (!((repeat == 0) && (id < FLAGS_warmup_steps))) {
           total_time_without_warmup += runtime;
-          num_samples_without_warmup += fetch.front().data.length() / (sizeof(float) * 3);
+          num_samples_without_warmup +=
+              fetch.front().data.length() / (sizeof(float) * 3);
         } else {
 #ifdef ENABLE_PADDLE_PROFILER
           if (FLAGS_profile) {
@@ -343,21 +352,22 @@ int main(int argc, char *argv[]) {
 
 #ifdef ENABLE_PADDLE_PROFILER
   if (FLAGS_profile) {
-    paddle::platform::DisableProfiler(
-        paddle::platform::EventSortingKey::kTotal, "ernie.inference.profile");
+    paddle::platform::DisableProfiler(paddle::platform::EventSortingKey::kTotal,
+                                      "ernie.inference.profile");
   }
 #endif
 
-  double per_sample_ms =
-      total_time / static_cast<double>(num_samples);
+  double per_sample_ms = total_time / static_cast<double>(num_samples);
   LOG(INFO) << "Run " << num_samples
             << " samples, average latency: " << per_sample_ms
             << " ms per sample.";
   double per_sample_ms_without_warmup =
-      total_time_without_warmup / static_cast<double>(num_samples_without_warmup);
+      total_time_without_warmup /
+      static_cast<double>(num_samples_without_warmup);
   LOG(INFO) << "Run " << num_samples_without_warmup
-            << " samples, average latency [exclude " << FLAGS_warmup_steps << " warmup steps]: "
-            << per_sample_ms_without_warmup << " ms per sample.";
+            << " samples, average latency [exclude " << FLAGS_warmup_steps
+            << " warmup steps]: " << per_sample_ms_without_warmup
+            << " ms per sample.";
 
   return 0;
 }
