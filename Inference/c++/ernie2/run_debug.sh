@@ -20,9 +20,9 @@ else
   export CUDA_VISIBLE_DEVICES="${gpu_id}"
 fi
 
-MODEL_DIR=/data/models/ernie_quant_int8/
-# MODEL_DIR=/data/models/transformed_qat_int8_model/
-DATA_FILE=/data/datasets/Ernie/1.8w.bs1
+MODEL_DIR=/data/wojtuss/models/ernie_quant_int8/
+# MODEL_DIR=/data/wojtuss/models/transformed_qat_int8_model/
+DATA_FILE=/data/wojtuss/datasets/Ernie/1.8w.bs1
 REPEAT=1
 
 if [ $# -ge 3 ]; then
@@ -43,7 +43,7 @@ if [ $# -ge 6 ]; then
   output_prediction=$6
 fi
 
-build_dir=build_release
+build_dir=build_debug
 
 cgdb --args \
 ./${build_dir}/inference --logtostderr \

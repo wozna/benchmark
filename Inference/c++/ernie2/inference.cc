@@ -35,6 +35,10 @@ DEFINE_bool(output_prediction, false,
             "Whether to output the prediction results.");
 DEFINE_bool(use_gpu, false, "Whether to use GPU for prediction.");
 DEFINE_bool(use_int8, false, "predict int8 model");
+DEFINE_bool(squash, false, "squash fc+dequantize");
+DEFINE_bool(remove_scale, false, "remove scale operator");
+DEFINE_bool(enable_memory_optim, false, "enable memory optimization");
+DEFINE_bool(short, false, "run only a few iterations");
 DEFINE_bool(debug, false, "generate .dot file after each pass");
 DEFINE_int32(device, 0, "device.");
 DEFINE_int32(num_threads, 1, "num_threads");
@@ -231,12 +235,30 @@ int main(int argc, char *argv[]) {
     config.EnableMKLDNN();
     config.SetCpuMathLibraryNumThreads(FLAGS_num_threads);
   }
-  config.SwitchSpecifyInputNames(true);
-  config.EnableMemoryOptim();
+  config.SwitchSpecifyInputNames(false);
   if (FLAGS_use_int8) {
-    std::cout << "---using int8---" << std::endl;
-    config.pass_builder()->DeletePass("fc_fuse_pass");
+    std::cout << "--- use int8 ---" << std::endl;
+    config.pass_builder()->AppendPass("fc_mkldnn_pass");
+  } else {
+    std::cout << "--- use fp32 ---" << std::endl;
   }
+  if (!FLAGS_remove_scale) {
+    std::cout << "--- keep scale ---" << std::endl;
+    config.pass_builder()->DeletePass("reshape_transpose_scale_pass");
+  } else {
+    std::cout << "--- remove scale ---" << std::endl;
+  }
+  if (FLAGS_enable_memory_optim) {
+    std::cout << "--- enable memory optim ---" << std::endl;
+    config.EnableMemoryOptim();
+  } else {
+    std::cout << "--- disabled memory optim ---" << std::endl;
+  }
+  if (FLAGS_squash) {
+    std::cout << "--- squash fc+dequantize ---" << std::endl;
+    config.pass_builder()->AppendPass("cpu_quantize_squash_pass");
+  }
+
   // config->pass_builder()->DeletePass("fc_fuse_pass");
   config.SwitchIrOptim(true);
   if (FLAGS_debug)
@@ -274,6 +296,8 @@ int main(int argc, char *argv[]) {
   }
   for (int i = 0; i < FLAGS_repeat; i++) {
     for (int id = 0; id < inputs.size(); ++id) {
+      if (FLAGS_short && id == 2)
+        break;
       fetch.clear();
       std::cout << "--- iteration " << id << " ---" << std::endl;
       auto start = std::chrono::system_clock::now();
