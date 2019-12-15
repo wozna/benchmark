@@ -302,10 +302,10 @@ int main(int argc, char *argv[]) {
       std::cout << "--- iteration " << id << " ---" << std::endl;
       auto start = std::chrono::system_clock::now();
       predictor->Run(inputs[id], &fetch);
+      auto end = std::chrono::system_clock::now();
       if (FLAGS_output_prediction && i == 0) {
         PrintOutputs(fetch);
       }
-      auto end = std::chrono::system_clock::now();
       count += 1;
       if (!fetch.empty()) {
         total_time +=

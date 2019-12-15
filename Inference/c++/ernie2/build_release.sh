@@ -3,6 +3,7 @@
 # build_dir=build_release
 # build_dir=build_release_develop
 build_dir=build_release_3d-fc_1.1
+# build_dir=build_release_old
 build_type=Release
 
 export PYTHONPATH=/data/wojtuss/repos/PaddlePaddle/Paddle/${build_dir}/python:/data/wojtuss/repos/PaddlePaddle/Paddle/${build_dir}/paddle
