@@ -245,6 +245,7 @@ int main(int argc, char *argv[]) {
   if (!FLAGS_remove_scale) {
     std::cout << "--- keep scale ---" << std::endl;
     config.pass_builder()->DeletePass("reshape_transpose_scale_pass");
+    config.pass_builder()->DeletePass("dequant_scale_pass");
   } else {
     std::cout << "--- remove scale ---" << std::endl;
   }

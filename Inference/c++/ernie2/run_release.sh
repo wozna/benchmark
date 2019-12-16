@@ -41,14 +41,19 @@ if [ $# -ge 6 ]; then
   output_prediction=$6
 fi
 
+export KMP_AFFINITY=granularity=fine,compact,1,0
+export KMP_BLOCKTIME=1
+
 # build_dir=build_release
 # build_dir=build_release_develop
-build_dir=build_release_3d-fc_1.1
+# build_dir=build_release_3d-fc_1.1
+build_dir=build_release_fc-int8-squash-1.1.1
 # build_dir=build_release_old
 
 # INT8
 # MODEL_DIR=/data/wojtuss/models/ernie_quant_int8/
-MODEL_DIR=/data/wojtuss/models/transformed_qat_int8_model/
+# MODEL_DIR=/data/wojtuss/models/transformed_qat_int8_model/
+MODEL_DIR=/data/wojtuss/models/ernie_int8_fc_reshape_transpose
 # MODEL_DIR=/data/wojtuss/models/ernie_qat_fc_reshape_transpose/
 ./${build_dir}/inference --logtostderr \
     --model_dir=${MODEL_DIR} \
@@ -59,8 +64,8 @@ MODEL_DIR=/data/wojtuss/models/transformed_qat_int8_model/
     --profile=${profile} \
     --output_prediction=${output_prediction} \
     --use_int8 \
-    --squash \
-    # --remove_scale \
+    --remove_scale \
+    # --squash \
     # --short \
     # --enable_memory_optim \
 
@@ -69,8 +74,8 @@ MODEL_DIR=/data/wojtuss/models/transformed_qat_int8_model/
     # --use_analysis=true \
 
 # FP32
-# # MODEL_DIR=/data/wojtuss/models/origin/
-# MODEL_DIR=/data/wojtuss/models/ernie2.0base_QATmodel_xnli_act/origin/
+# MODEL_DIR=/data/wojtuss/models/origin/
+# # MODEL_DIR=/data/wojtuss/models/ernie2.0base_QATmodel_xnli_act/origin/
 # ./${build_dir}/inference --logtostderr \
     # --model_dir=${MODEL_DIR} \
     # --data=${DATA_FILE} \

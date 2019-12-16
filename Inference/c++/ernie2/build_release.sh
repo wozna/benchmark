@@ -2,7 +2,8 @@
 
 # build_dir=build_release
 # build_dir=build_release_develop
-build_dir=build_release_3d-fc_1.1
+# build_dir=build_release_3d-fc_1.1
+build_dir=build_release_fc-int8-squash-1.1.1
 # build_dir=build_release_old
 build_type=Release
 
