@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
 #include <chrono>
 #include <fstream>
 #include <gflags/gflags.h>
@@ -23,6 +24,7 @@
 #include <string>
 #include <vector>
 
+
 #ifdef ENABLE_PADDLE_PROFILER
 #include <paddle/fluid/platform/profiler.h>
 DECLARE_bool(profile);
@@ -30,6 +32,7 @@ DECLARE_bool(profile);
 
 DEFINE_string(model_dir, "", "model directory");
 DEFINE_string(data, "", "input data path");
+DEFINE_string(label,"", "label path" );
 DEFINE_int32(repeat, 1, "repeat");
 DEFINE_bool(output_prediction, false,
             "Whether to output the prediction results.");
@@ -210,6 +213,30 @@ bool LoadInputData(std::vector<std::vector<paddle::PaddleTensor>> *inputs) {
   return true;
 }
 
+bool LoadLabels(std::vector<int> *labels) {
+  if (FLAGS_label.empty()) {
+    LOG(ERROR) << "please set label path";
+    return false;
+  }
+  std::ifstream labelFile(FLAGS_label);
+  int label;
+  while (labelFile >> label) {
+   labels->push_back(label);
+  }
+  labelFile.close();
+  return true;
+}
+
+void CalculateAccuracy(const std::vector<paddle::PaddleTensor> &fetch, 
+                       std::vector<float> *out, int label, int *correct){
+  out->push_back(static_cast<float *>(fetch[0].data.data())[0]);
+  out->push_back(static_cast<float *>(fetch[0].data.data())[1]);
+  out->push_back(static_cast<float *>(fetch[0].data.data())[2]);
+  if((std::max_element(out->begin(), out->end()) - out->begin()) == label)
+    (*correct)++;
+  return;
+}
+
 // Bert inference demo
 // Options:
 //     --model_dir: bert model file directory
@@ -272,6 +299,11 @@ int main(int argc, char *argv[]) {
     LOG(ERROR) << "load input data error!";
     return -1;
   }
+ std::vector<int> labels;
+  if(!LoadLabels(&labels)) {
+    LOG(ERROR)<<"load label error!";
+    return-1;
+  }
 
 #ifdef ENABLE_PADDLE_PROFILER
   if (FLAGS_profile) {
@@ -288,10 +320,13 @@ int main(int argc, char *argv[]) {
 #endif
 
   std::vector<paddle::PaddleTensor> fetch;
+  std::vector<float> out;
+  float sum_accuracy = 0.0f;
   int total_time{0};
   // auto predict_timer = []()
   int num_samples{0};
   int count{0};
+  int correct{0};
   for (int i = 0; i < 100; i++) { // warm up
     predictor->Run(inputs[0], &fetch);
   }
@@ -300,6 +335,7 @@ int main(int argc, char *argv[]) {
       if (FLAGS_short && id == 2)
         break;
       fetch.clear();
+      out.clear();
       std::cout << "--- iteration " << id << " ---" << std::endl;
       auto start = std::chrono::system_clock::now();
       predictor->Run(inputs[id], &fetch);
@@ -312,11 +348,15 @@ int main(int argc, char *argv[]) {
         total_time +=
             std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
                 .count();
+        CalculateAccuracy(fetch, &out, labels[id], &correct);
         // num_samples += fetch.front().data.length() / 2 / sizeof(float);
         // num_samples += fetch.front().data.length() / (sizeof(float) * 3);
         num_samples++;
       }
     }
+     LOG(INFO) << " --- repeat " << i << " --- "
+              << " avg accuracy = "<< correct / ((num_samples)*1.0f) ;
+    sum_accuracy += correct / ((num_samples)*1.0f);
   }
 
 #ifdef ENABLE_PADDLE_PROFILER
@@ -333,6 +373,9 @@ int main(int argc, char *argv[]) {
             << " samples, average latency: " << per_sample_ms
             << "ms per sample.";
   LOG(INFO) << count;
+  LOG(INFO) << "AVG accuracy summary " 
+            << (FLAGS_use_int8 ? "INT8:  ": "FP32:  ")  
+            << sum_accuracy / FLAGS_repeat*1.0f;
 
   return 0;
 }
